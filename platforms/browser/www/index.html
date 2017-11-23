@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<!--
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+     KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+-->
+<html>
+    <head>
+        <!--
+        Customize this policy to fit your own app's needs. For more guidance, see:
+            https://github.com/apache/cordova-plugin-whitelist/blob/master/README.md#content-security-policy
+        Some notes:
+            * gap: is required only on iOS (when using UIWebView) and is needed for JS->native communication
+            * https://ssl.gstatic.com is required only on Android and is needed for TalkBack to function properly
+            * Disables use of inline scripts in order to mitigate risk of XSS vulnerabilities. To change this:
+                * Enable inline JS: add 'unsafe-inline' to default-src
+        -->
+<!--        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content:;">-->
+        <meta name="viewport" content="width=device-width">
+        <style>
+
+            html, body {
+			width: 100%;
+			height: 100%;
+			margin: 0px;
+			border: 0;
+			display: block;  /* No floating content on sides */
+		}
+        </style>
+        <meta name="format-detection" content="telephone=no">
+        <meta name="msapplication-tap-highlight" content="no">
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
+        <link rel="stylesheet" type="text/css" href="css/index.css">
+        <title>$1 Recognizer Implementation</title>
+        <script type="text/javascript" src="https://depts.washington.edu/madlab/proj/dollar/canvas.text.js"></script>
+  	<script type="text/javascript" src="https://depts.washington.edu/madlab/proj/dollar/faces/gentilis-normal-normal.js"></script>
+  	<script type="text/javascript" src="https://depts.washington.edu/madlab/proj/dollar/jquery-1.7.2.min.js"></script>
+  	<script type="text/javascript" src="https://depts.washington.edu/madlab/proj/dollar/dollar.js"></script>
+  	<script type="text/javascript">
+
+        //
+  		// Startup
+  		//
+        
+        var isDown, isDown2, points, points2, recogniser, recogniser2, drawing, drawing2, canvasRect, canvasRect2, ctx, ctx2;
+
+  		function onLoadEvent()
+  		{
+  			points = new Array();
+            points2 = new Array();
+  			recogniser = new DollarRecognizer();
+  			recogniser2 = new DollarRecognizer();
+
+  		    var canvas = document.getElementById('myCanvas');
+            var canvas2 = document.getElementById('myCanvas2');
+            
+  			if(canvas.getContext)
+                ctx = canvas.getContext('2d');
+
+            drawing = canvas.getContext('2d');
+  			drawing.fillStyle = "rgb(0,200,225)";
+  			drawing.strokeStyle = "rgb(0,200,225)";
+  			drawing.lineWidth = 3;
+  			drawing.font = "16px Gentilis";
+  			canvasRect = getCanvasRect(canvas); // canvas rect on page
+  			drawing.fillStyle = "rgb(255,255,136)";
+  			drawing.fillRect(0, 0, canvasRect.width, 20);
+            
+            
+            if(canvas2.getContext)
+                ctx2 = canvas2.getContext('2d');
+
+            drawing2 = canvas2.getContext('2d');
+  			drawing2.fillStyle = "rgb(0,200,225)";
+  			drawing2.strokeStyle = "rgb(0,200,225)";
+  			drawing2.lineWidth = 3;
+  			drawing2.font = "16px Gentilis";
+  			canvasRect2 = getCanvasRect(canvas2); // canvas rect on page
+  			drawing2.fillStyle = "rgb(255,255,136)";
+  			drawing2.fillRect(0, 0, canvasRect2.width, 20);
+  			isDown = false;
+            isDown2 = false;
+
+  		}
+
+
+  		//
+  		// Mouse Events
+  		//
+
+  		function mouseDownEvent(x, y, num)
+  		{
+            var _isDown, _canvasRect, _points, _drawing;
+            if(num == 1) {
+                _isDown = isDown;
+                _canvasRect = canvasRect;
+                _points = points;
+                _drawing = drawing;
+            } else if (num == 2) {
+                _isDown = isDown2;
+                _canvasRect = canvasRect2;
+                _points = points2;
+                _drawing = drawing2;
+            }
+            
+            document.onselectstart = function() { return false; } // disable drag-select
+  			document.onmousedown = function() { return false; } // disable drag-select
+  			_isDown = true;
+  			x -= _canvasRect.x - getScrollX();
+  			y -= _canvasRect.y - getScrollY();
+  			if (_points.length > 0)
+  				_drawing.clearRect(0, 0, _canvasRect.width, _canvasRect.height);
+  			_points.length = 1; // clear
+  			_points[0] = new Point(x, y);
+  			drawText("Recording unistroke...", _drawing, _canvasRect);
+  			_drawing.fillRect(x - 4, y - 3, 9, 9);
+            
+            if(num == 1) {
+                isDown = _isDown;
+                canvasRect = _canvasRect;
+                points = _points;
+                drawing = _drawing;
+            } else if(num == 2) {
+                isDown2 = _isDown;
+                canvasRect2 = _canvasRect;
+                points2 = _points;
+                drawing2 = _drawing;
+            }
+  		}
+        
+
+  		function mouseMoveEvent(x, y, num)
+  		{
+            var _isDown, _canvasRect, _points, _drawing;
+            if(num == 1) {
+                _isDown = isDown;
+                _canvasRect = canvasRect;
+                _points = points;
+                _drawing = drawing;
+            } else if (num == 2) {
+                _isDown = isDown2;
+                _canvasRect = canvasRect2;
+                _points = points2;
+                _drawing = drawing2;
+            }
+            
+  			if (_isDown)
+  			{
+  				x -= _canvasRect.x - getScrollX();
+  				y -= _canvasRect.y - getScrollY();
+  				_points[_points.length] = new Point(x, y); // append
+  				drawConnectedPoint(_points.length - 2, _points.length - 1, _drawing, _points);
+  			}
+            
+             
+            if(num == 1) {
+                isDown = _isDown;
+                canvasRect = _canvasRect;
+                points = _points;
+                drawing = _drawing;
+            } else if(num == 2) {
+                isDown2 = _isDown;
+                canvasRect2 = _canvasRect;
+                points2 = _points;
+                drawing2 = _drawing;
+            }
+  		}
+       
+
+  		function mouseUpEvent(x, y, num)
+  		{
+            var _isDown, _canvasRect, _points, _drawing;
+            if(num == 1) {
+                _isDown = isDown;
+                _canvasRect = canvasRect;
+                _points = points;
+                _drawing = drawing;
+            } else if (num == 2) {
+                _isDown = isDown2;
+                _canvasRect = canvasRect2;
+                _points = points2;
+                _drawing = drawing2;
+            }
+            
+  			document.onselectstart = function() { return true; } // enable drag-select
+  			document.onmousedown = function() { return true; } // enable drag-select
+  			if (_isDown)
+  			{
+  				_isDown = false;
+  				if (_points.length >= 10)
+  				{
+  					var result = recogniser.Recognize(_points, document.getElementById('useProtractor').checked);
+  					drawText("Result: " + result.Name + " (" + round(result.Score,2) + ").", _drawing, _canvasRect);
+  				}
+  				else // fewer than 10 points were inputted
+  				{
+  					drawText("Too few points made. Please try again.", _drawing, _canvasRect);
+  				}
+  			}
+            
+            if(num == 1) {
+                isDown = _isDown;
+                canvasRect = _canvasRect;
+                points = _points;
+                drawing = _drawing;
+            } else if(num == 2) {
+                isDown2 = _isDown;
+                canvasRect2 = _canvasRect;
+                points2 = _points;
+                drawing2 = _drawing;
+            }
+  		}
+  		
+        
+        //
+        // Touch functions
+        //
+
+        function touchStartEvent(x, y, num)
+  		{
+            var _isDown, _canvasRect, _points, _drawing;
+            if(num == 1) {
+                _isDown = isDown;
+                _canvasRect = canvasRect;
+                _points = points;
+                _drawing = drawing;
+            } else if (num == 2) {
+                _isDown = isDown2;
+                _canvasRect = canvasRect2;
+                _points = points2;
+                _drawing = drawing2;
+            }
+            
+            event.preventDefault();
+  			document.onselectstart = function() { return false; } // disable drag-select
+  			document.onmousedown = function() { return false; } // disable drag-select
+  			_isDown = true;
+  			x -= _canvasRect.x - getScrollX();;
+  			y -= _canvasRect.y - getScrollY();
+  			if (_points.length > 0)
+  				_drawing.clearRect(0, 0, _canvasRect.width, _canvasRect.height);
+  			_points.length = 1; // clear
+  			_points[0] = new Point(x, y);
+  			drawText("Recording unistroke...", _drawing, _canvasRect);
+  			_drawing.fillRect(x - 4, y - 3, 9, 9);
+  		
+         
+            if(num == 1) {
+                isDown = _isDown;
+                canvasRect = _canvasRect;
+                points = _points;
+                drawing = _drawing;
+            } else if(num == 2) {
+                isDown2 = _isDown;
+                canvasRect2 = _canvasRect;
+                points2 = _points;
+                drawing2 = _drawing;
+            }
+        }
+      
+  		function touchMoveEvent(x, y, num)
+  		{
+            var _isDown, _canvasRect, _points, _drawing;
+            if(num == 1) {
+                _isDown = isDown;
+                _canvasRect = canvasRect;
+                _points = points;
+                _drawing = drawing;
+            } else if (num == 2) {
+                _isDown = isDown2;
+                _canvasRect = canvasRect2;
+                _points = points2;
+                _drawing = drawing2;
+            }
+            event.preventDefault();
+  			if (_isDown)
+  			{
+  				x -= _canvasRect.x - getScrollX();
+  				y -= _canvasRect.y - getScrollY();
+  				_points[_points.length] = new Point(x, y); // append
+  				drawConnectedPoint(_points.length - 2, _points.length - 1, _drawing, _points);
+  			}
+            
+            if(num == 1) {
+                isDown = _isDown;
+                canvasRect = _canvasRect;
+                points = _points;
+                drawing = _drawing;
+            } else if(num == 2) {
+                isDown2 = _isDown;
+                canvasRect2 = _canvasRect;
+                points2 = _points;
+                drawing2 = _drawing;
+            }
+  		}
+        
+       
+  		function touchEndEvent(x, y, num)
+  		{
+            var _isDown, _canvasRect, _points, _drawing;
+            if(num == 1) {
+                _isDown = isDown;
+                _canvasRect = canvasRect;
+                _points = points;
+                _drawing = drawing;
+            } else if (num == 2) {
+                _isDown = isDown2;
+                _canvasRect = canvasRect2;
+                _points = points2;
+                _drawing = drawing2;
+            }
+            event.preventDefault();
+  			document.onselectstart = function() { return true; } // enable drag-select
+  			document.onmousedown = function() { return true; } // enable drag-select
+  			if (_isDown)
+  			{
+  				_isDown = false;
+  				if (_points.length >= 10)
+  				{
+  					var result = recogniser.Recognize(points, document.getElementById('useProtractor').checked);
+  					drawText("Result: " + result.Name + " (" + round(result.Score,2) + ").", _drawing, _canvasRect);
+  				}
+  				else // fewer than 10 points were inputted
+  				{
+  					drawText("Too few points made. Please try again.", _drawing, _canvasRect);
+  				}
+  			}
+            
+            if(num == 1) {
+                isDown = _isDown;
+                canvasRect = _canvasRect;
+                points = _points;
+                drawing = _drawing;
+            } else if(num == 2) {
+                isDown2 = _isDown;
+                canvasRect2 = _canvasRect;
+                points2 = _points;
+                drawing2 = _drawing;
+            }
+  		}
+
+
+    
+        //
+        // Drawing functions
+        //
+
+  		function drawText(str, drawing, canvasRect)
+  		{
+  			drawing.fillStyle = "rgb(255,255,136)";
+  			drawing.fillRect(0, 0, canvasRect.width, 20);
+  			drawing.fillStyle = "rgb(0,0,255)";
+  			drawing.fillText(str, 1, 14);
+  		}
+  		function drawConnectedPoint(from, to, drawing, points)
+  		{
+  			drawing.beginPath();
+  			drawing.moveTo(points[from].X, points[from].Y);
+  			drawing.lineTo(points[to].X, points[to].Y);
+  			drawing.closePath();
+  			drawing.stroke();
+  		}
+
+
+        //
+        // Auxiliary functions
+        //
+
+        function round(n, d) // round 'n' to 'd' decimals
+  		{
+  			d = Math.pow(10, d);
+  			return Math.round(n * d) / d
+  		}
+
+        function getScrollY()
+  		{
+  			var scrollY = $(window).scrollTop();
+  			return scrollY;
+  		}
+
+        function getScrollX()
+  		{
+  			var scrollX = $(window).scrollLeft();
+  			return scrollX;
+  		}
+	    
+        function getCanvasRect(canvas)
+  		{
+  			var w = canvas.width;
+  			var h = canvas.height;
+
+  			var cx = canvas.offsetLeft;
+  			var cy = canvas.offsetTop;
+  			while (canvas.offsetParent != null)
+  			{
+  				canvas = canvas.offsetParent;
+  				cx += canvas.offsetLeft;
+  				cy += canvas.offsetTop;
+  			}
+  			return {x: cx, y: cy, width: w, height: h};
+  		}
+        
+/*        
+  		//
+  		// Unistroke Adding and Clearing
+  		//
+
+  		function onClickAddExisting(points)
+  		{
+  			if (points.length >= 10)
+  			{
+  				var unistrokes = document.getElementById('unistrokes');
+  				var name = unistrokes[unistrokes.selectedIndex].value;
+  				var num = recogniser.AddGesture(name, points);
+  				drawText("\"" + name + "\" added. Number of \"" + name + "\"s defined: " + num + ".");
+  			}
+  		}
+  		function onClickAddCustom()
+  		{
+  			var name = document.getElementById('custom').value;
+  			if (points2.length >= 10 && name.length > 0)
+  			{
+  				var num = recogniser2.AddGesture(name, points2);
+  				drawText("\"" + name + "\" added. Number of \"" + name + "\"s defined: " + num + ".");
+  			}
+  		}
+  		function onClickCustom()
+  		{
+  			document.getElementById('custom').select();
+  		}
+  		function onClickDelete()
+  		{
+  			var num = recogniser.DeleteUserGestures(); // deletes any user-defined unistrokes
+  			alert("All user-defined gestures have been deleted. Only the 1 predefined gesture remains for each of the " + num + " types.");
+  		}
+
+*/
+        
+  	</script>
+
+    <title>Mobile Sketching Interface</title>
+  </head>
+
+   <body onload="onLoadEvent()">
+  <h1>Mobile Sketching Interface</h1>
+  <p>
+          <canvas id="myCanvas" width="300" height="300" style="background-color:#ffffff;margin-left: 5%;margin-right: 5%;"
+              onmousedown="mouseDownEvent(event.clientX, event.clientY, 1)"
+              onmousemove="mouseMoveEvent(event.clientX, event.clientY, 1)"
+              onmouseup="mouseUpEvent(event.clientX, event.clientY, 1)"
+              oncontextmenu="return false;"
+              ontouchstart="touchStartEvent(event.touches[0].pageX, event.touches[0].pageY, 1)"
+              ontouchmove="touchMoveEvent(event.touches[0].pageX, event.touches[0].pageY, 1)"
+              ontouchend="touchEndEvent(event.changedTouches[0].pageX, event.changedTouches[0].pageY, 1)"
+             >
+            <span style="background-color:#ffffff;">The &lt;canvas&gt; element is not supported by this browser.</span>
+          </canvas>
+      <br>
+<canvas id="myCanvas2" width="300" height="300" style="background-color:#ffffff;margin-left: 5%;margin-right: 5%;"
+              onmousedown="mouseDownEvent(event.clientX, event.clientY, 2)"
+              onmousemove="mouseMoveEvent(event.clientX, event.clientY, 2)"
+              onmouseup="mouseUpEvent(event.clientX, event.clientY, 2)"
+              oncontextmenu="return false;"
+              ontouchstart="touchStartEvent(event.touches[0].pageX, event.touches[0].pageY, 2)"
+              ontouchmove="touchMoveEvent(event.touches[0].pageX, event.touches[0].pageY, 2)"
+              ontouchend="touchEndEvent(event.changedTouches[0].pageX, event.changedTouches[0].pageY, 2)"
+             >
+            <span style="background-color:#ffffff;">The &lt;canvas&gt; element is not supported by this browser.</span>
+          </canvas>
+<!--
+       <td valign="top" align="center">
+          <p style="margin-bottom: 2%;font-size:10pt;margin-top: 2%;margin-left: 5%;margin-right: 5%;"><i>Make strokes on this canvas. If a misrecognition occurs,
+          add the misrecognized unistroke as an example of the intended gesture.</i>
+          </p>
+
+           Editing area below stroking canvas area 
+          <table border="0" width=90% style="font-size:10pt;margin-left: 5%;margin-right: 5%;">
+            <tr>
+              <td valign="top" align="left">Add as example of existing type:</td>
+              <td valign="top" align="right">
+                <select id="unistrokes" style="width:136px" onkeypress="if (event.keyCode == 13) onClickAddExisting()">
+                  <option selected value="triangle">triangle</option>
+                  <option value="x">x</option>
+                  <option value="rectangle">rectangle</option>
+                  <option value="circle">circle</option>
+                  <option value="check">check</option>
+                  <option value="caret">caret</option>
+                  <option value="zig-zag">zig-zag</option>
+                  <option value="arrow">arrow</option>
+                  <option value="left square bracket">left square bracket</option>
+                  <option value="right square bracket">right square bracket</option>
+                  <option value="v">v</option>
+                  <option value="delete">delete</option>
+                  <option value="left curly brace">left curly brace</option>
+                  <option value="right curly brace">right curly brace</option>
+                  <option value="star">star</option>
+                  <option value="pigtail">pigtail</option>
+                </select>
+              </td>
+              <td valign="top" align="right"><input type="button" style="width:64px" value="  Add   " onclick="onClickAddExisting()" /></td>
+            </tr>
+            <tr>
+              <td valign="top" align="left">Add as example of custom type:</td>
+              <td valign="top" align="right"><input type="text" id="custom" style="width:130px" value="Type name here..." onclick="onClickCustom()" onkeypress="if (event.keyCode == 13) onClickAddCustom()" /></td>
+              <td valign="top" align="right"><input type="button" style="width:64px" value="  Add   " onclick="onClickAddCustom()" /></td>
+            </tr>
+            <tr>
+              <td valign="top" align="left">Delete all user-defined gestures:</td>
+              <td valign="top" align="right">&nbsp;</td>
+              <td valign="top" align="right"><input type="button" style="width:64px" value="Delete" onclick="onClickDelete()" /></td>
+            </tr>
+          </table>
+        </td>
+-->
+
+
+                 <p>
+            <form style="font-size:10pt;margin-top: 0px;margin-left: 5%;margin-right: 5%;">
+              <input type="radio" name="search" id="useGSS" checked>
+                <span style="font-weight:bold">Use Golden Section Search <i>(original)</i></span>
+              </input><br />
+              <input type="radio" name="search" id="useProtractor">
+                <span style="font-weight:bold">Use Protractor <i>(faster)</i></span>
+              </input>
+            </form>
+          </p>
+       </p>
+
+</body>
+
+</html>
